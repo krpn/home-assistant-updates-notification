@@ -164,7 +164,7 @@ alert:
     name: Updates available
     message: >-
       ❗️ Updates available
-      {% if states('binary_sensor.updater_addons') == 'on' or states('binary_sensor.updater_supervisor') == 'on' or states('binary_sensor.updater_os') == 'on' %}
+      {% if states('binary_sensor.updater_core') == 'on' or states('binary_sensor.updater_supervisor') == 'on' or states('binary_sensor.updater_os') == 'on' %}
       
       
       System:
