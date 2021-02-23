@@ -4,6 +4,15 @@
 
 This is example configuration to get updates notification in a Telegram chat.
 
+Notifies about:
+
+- Core updates
+- Supervisor updates
+- OS updates
+- Supervisor Add-ons updates
+- HACS Integrations/Frontend updates
+- Valetudo Firmware updates
+
 [Lovelace UI card example](#lovelace-ui-card-example) is also available.
 
 ## How it looks
@@ -24,7 +33,7 @@ The links in the message are clickable.
 
 ![image](https://raw.githubusercontent.com/krpn/home-assistant-updates-notification/master/images/lovelace.png)
 
-You need to install [Lovelace auto-entities card](https://github.com/thomasloven/lovelace-auto-entities/) in order to use the below code.
+You need to install [Lovelace auto-entities card](https://github.com/thomasloven/lovelace-auto-entities) in order to use the below code.
 
 ```yaml
 cards:
