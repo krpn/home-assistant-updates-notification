@@ -1,0 +1,236 @@
+# Version sensors
+sensor:
+  - platform: command_line
+    name: core_updates
+    command: 'curl http://supervisor/core/info -H "Authorization: Bearer $(printenv SUPERVISOR_TOKEN)" | jq ''{"latest_version":.data.version_latest,"installed_version":.data.version,"update_available":.data.update_available}'''
+    value_template: '{{ value_json.update_available }}'
+    scan_interval: 600
+    json_attributes:
+      - update_available
+      - latest_version
+      - installed_version
+
+  - platform: command_line
+    name: supervisor_updates
+    command: 'curl http://supervisor/supervisor/info -H "Authorization: Bearer $(printenv SUPERVISOR_TOKEN)" | jq ''{"latest_version":.data.version_latest,"installed_version":.data.version,"update_available":.data.update_available}'''
+    value_template: '{{ value_json.update_available }}'
+    scan_interval: 600
+    json_attributes:
+      - update_available
+      - latest_version
+      - installed_version
+
+  - platform: command_line
+    name: os_updates
+    command: 'curl http://supervisor/os/info -H "Authorization: Bearer $(printenv SUPERVISOR_TOKEN)" | jq ''{"latest_version":.data.version_latest,"installed_version":.data.version,"update_available":.data.update_available}'''
+    value_template: '{{ value_json.update_available }}'
+    scan_interval: 600
+    json_attributes:
+      - update_available
+      - latest_version
+      - installed_version
+
+  - platform: command_line
+    name: addons_updates
+    command: 'curl http://supervisor/addons -H "Authorization: Bearer $(printenv SUPERVISOR_TOKEN)" | jq ''{"addons":[.data.addons[] | select(.update_available)]}'''
+    value_template: '{{ value_json.addons | length }}'
+    scan_interval: 600
+    unit_of_measurement: pending update(s)
+    json_attributes:
+      - addons
+
+  - platform: command_line
+    name: valetudo_installed_version
+    command: 'cat /config/secrets.yaml | grep valetudo_cleaner_host | cut -d" " -f2 | xargs -I{} curl -s http://{}/api/v2/valetudo/version'
+    value_template: '{{ value_json.release }}'
+    scan_interval: 600
+
+  - platform: command_line
+    name: valetudo_latest_version
+    command: 'curl -s https://api.github.com/repos/Hypfer/Valetudo/releases/latest'
+    value_template: '{{ value_json.tag_name }}'
+    scan_interval: 600
+
+# Updates sensors
+binary_sensor:
+  - platform: template
+    sensors:
+      updater_core:
+        friendly_name: Core
+        device_class: problem
+        value_template: "{{ states('sensor.core_updates') }}"
+        attribute_templates:
+          installed_version: "{{ state_attr('sensor.core_updates', 'installed_version') }}"
+          latest_version: "{{ state_attr('sensor.core_updates', 'latest_version') }}"
+
+      updater_supervisor:
+        friendly_name: Supervisor
+        device_class: problem
+        value_template: "{{ states('sensor.supervisor_updates') }}"
+        attribute_templates:
+          installed_version: "{{ state_attr('sensor.supervisor_updates', 'installed_version') }}"
+          latest_version: "{{ state_attr('sensor.supervisor_updates', 'latest_version') }}"
+
+      updater_os:
+        friendly_name: OS
+        device_class: problem
+        value_template: "{{ states('sensor.os_updates') }}"
+        attribute_templates:
+          installed_version: "{{ state_attr('sensor.os_updates', 'installed_version') }}"
+          latest_version: "{{ state_attr('sensor.os_updates', 'latest_version') }}"
+
+      updater_addons:
+        friendly_name: Supervisor Add-ons
+        device_class: problem
+        value_template: "{{ states('sensor.addons_updates') != 0 }}"
+        attribute_templates:
+          addons: "{{ state_attr('sensor.addons_updates', 'addons') }}"
+
+      updater_hacs:
+        friendly_name: HACS Integrations/Frontend
+        device_class: problem
+        value_template: "{{ states('sensor.hacs') != 0 }}"
+        attribute_templates:
+          repositories: "{{ state_attr('sensor.hacs', 'repositories') }}"
+
+      updater_valetudo:
+        friendly_name: Valetudo
+        device_class: problem
+        value_template: "{{ states('sensor.valetudo_installed_version') != states('sensor.valetudo_latest_version') }}"
+        attribute_templates:
+          installed_version: "{{ states('sensor.valetudo_installed_version') }}"
+          latest_version: "{{ states('sensor.valetudo_latest_version') }}"
+
+# Forwarding from secrets to use in alert text
+input_text:
+  base_url:
+    name: Home Assistant URL
+    initial: !secret base_url
+  valetudo_host:
+    name: Valetudo IP
+    initial: !secret valetudo_cleaner_host
+
+# Customization (for Lovelace, etc.)
+homeassistant:
+  customize:
+    input_text.base_url:
+      hidden: true
+    input_text.valetudo_host:
+      hidden: true
+    binary_sensor.updater:
+      friendly_name: Core
+    sensor.core_updates:
+      friendly_name: Core Update Available
+    sensor.supervisor_updates:
+      friendly_name: Supervisor Update Available
+    sensor.os_updates:
+      friendly_name: OS Update Available
+    sensor.addons_updates:
+      friendly_name: Supervisor Add-ons Update Available
+    sensor.hacs:
+      friendly_name: HACS Integrations/Frontend Update Available
+    sensor.valetudo_installed_version:
+      friendly_name: Valetudo Installed Version
+    sensor.valetudo_latest_version:
+      friendly_name: Valetudo Latest Version
+
+# Group for updates sensors
+group:
+  updaters:
+    name: Updates
+    entities:
+      - binary_sensor.updater_core
+      - binary_sensor.updater_supervisor
+      - binary_sensor.updater_os
+      - binary_sensor.updater_addons
+      - binary_sensor.updater_hacs
+      - binary_sensor.updater_valetudo
+
+# Notification configuration
+telegram_bot:
+  - platform: polling
+    api_key: !secret telegram_bot_api_token
+    allowed_chat_ids:
+      - !secret home_system_chat_id
+
+notify:
+  - platform: telegram
+    name: home_system_chat
+    chat_id: !secret home_system_chat_id
+
+# Updates available alert
+alert:
+  updates_available:
+    name: Updates available
+    message: >-
+      ❗️ Updates available
+      {% if states('binary_sensor.updater_addons') == 'on' or states('binary_sensor.updater_supervisor') == 'on' or states('binary_sensor.updater_os') == 'on' %}
+      
+      
+      System:
+      {% if states('binary_sensor.updater_core') == 'on' %}
+      
+      - Core: [{{ state_attr('binary_sensor.updater_core', 'installed_version') }} → {{ state_attr('binary_sensor.updater_core', 'latest_version') }}]({{ states('input_text.base_url') }}hassio/dashboard) / [changelog](https://github.com/home-assistant/core/releases) / [release notes](https://www.home-assistant.io/latest-release-notes/)
+      {% endif %}
+      {% if states('binary_sensor.updater_supervisor') == 'on' %}
+      
+      - Supervisor: [{{ state_attr('binary_sensor.updater_supervisor', 'installed_version') }} → {{ state_attr('binary_sensor.updater_supervisor', 'latest_version') }}]({{ states('input_text.base_url') }}hassio/dashboard) / [changelog](https://github.com/home-assistant/supervisor/releases)
+      {% endif %}
+      {% if states('binary_sensor.updater_os') == 'on' %}
+      
+      - OS: [{{ state_attr('binary_sensor.updater_os', 'installed_version') }} → {{ state_attr('binary_sensor.updater_os', 'latest_version') }}]({{ states('input_text.base_url') }}hassio/dashboard) / [changelog](https://github.com/home-assistant/operating-system/releases)
+      {% endif %}
+      {% endif %}
+      {% if states('binary_sensor.updater_addons') == 'on' %}
+      
+      
+      Supervisor Add-ons:
+      {% for addon in state_attr('binary_sensor.updater_addons', 'addons') %}
+      
+      - {{ addon.name }}: [{{ addon.version }} → {{ addon.version_latest }}]({{ states('input_text.base_url') }}hassio/addon/{{ addon.slug }}/info) / [homepage]({{ addon.url }})
+      {% endfor %}
+      {% endif %}
+      {% if states('binary_sensor.updater_hacs') == 'on' %}
+      
+      
+      HACS Integrations/Frontend:
+      {% for repository in state_attr('binary_sensor.updater_hacs', 'repositories') %}
+      
+      - {{ repository.display_name }}: [{{ repository.installed_version }} → {{ repository.available_version }}]({{ states('input_text.base_url') }}hacs/entry) / [changelog](https://github.com/{{ repository.name }}/releases)
+      {% endfor %}
+      {% endif %}
+      {% if states('binary_sensor.updater_valetudo') == 'on' %}
+      
+      
+      Firmwares:
+      {% if states('binary_sensor.updater_valetudo') == 'on' %}
+      
+      - Valetudo: [{{ state_attr('binary_sensor.updater_valetudo', 'installed_version') }} → {{ state_attr('binary_sensor.updater_valetudo', 'latest_version') }}](http://{{ states('input_text.valetudo_host') }}/) / [changelog](https://github.com/Hypfer/Valetudo/releases)
+      {% endif %}
+      {% endif %}
+    done_message: "✅ No updates available"
+    entity_id: group.updaters
+    state: "on"
+    skip_first: true
+    repeat:
+      - 1
+      - 60
+      - 720
+      - 1440
+    data:
+      disable_web_page_preview: true # doesn't work at the moment, don't know why
+    notifiers:
+      - home_system_chat
+
+# Lovelace UI card example
+# cards:
+#   - type: custom:auto-entities
+#     card:
+#       type: entities
+#       title: Updates
+#       state_color: true
+#     filter:
+#       include:
+#         - group: group.updaters
+#           options:
+#             secondary_info: last-changed
