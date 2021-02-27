@@ -11,7 +11,7 @@ Notifies about:
 - OS updates
 - Supervisor Add-ons updates
 - HACS Integrations/Frontend updates
-- Valetudo Firmware updates
+- [Valetudo](https://valetudo.cloud/) Firmware updates
 
 [Lovelace UI card example](#lovelace-ui-card-example) is also available.
 
@@ -25,7 +25,7 @@ The links in the message are clickable.
 
 1. Copy the contents of the [`secrets.yaml`](https://github.com/krpn/home-assistant-updates-notification/blob/master/secrets.yaml) to your `secrets.yaml` file and change it according to your home configuration
 1. Copy the contents of the [`configuration.yaml`](https://github.com/krpn/home-assistant-updates-notification/blob/master/configuration.yaml) to your `configuration.yaml`
-    - You can remove any sensors if you don't need some of them
+    - You can remove any sensors if you don't need some of them (for example, you can remove Valetudo entities if you don't use it)
     - You can change the alert text according to your needs
 1. Restart Home Assistant
 
