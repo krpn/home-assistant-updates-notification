@@ -2,7 +2,7 @@
 
 ## Briefly
 
-This is example configuration to get updates notification in a Telegram chat.
+This is example configuration to get updates notification in a Telegram chat. Based on multiple configurations from [Home-Assistan Community topic](https://community.home-assistant.io/t/update-notifications-core-hacs-supervisor-and-addons/182295).
 
 Notifies about:
 
